@@ -183,6 +183,9 @@ void asst::Controller::pipe_working_proc()
 std::optional<std::string> asst::Controller::call_command(const std::string& cmd, int64_t timeout, bool allow_reconnect,
                                                           bool recv_by_socket)
 {
+    LogTraceFunction;
+    Log.trace(cmd, timeout, allow_reconnect, recv_by_socket);
+
     using namespace std::chrono_literals;
     using namespace std::chrono;
     // LogTraceScope(std::string(__FUNCTION__) + " | `" + cmd + "`");
@@ -240,6 +243,7 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
     SOCKET client_socket = INVALID_SOCKET;
     std::unique_lock<std::mutex> socket_lock;
 
+    Log.trace(__FUNCTION__, __LINE__, "before if (recv_by_socket)");
     if (recv_by_socket) {
         // acquire socket accept lock
         socket_lock = std::unique_lock<std::mutex>(m_socket_mutex);
@@ -263,7 +267,9 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
         }
     }
 
+    Log.trace(__FUNCTION__, __LINE__, "before while");
     while (true) {
+        Log.trace("in while, begin");
         if (need_exit()) {
             break;
         }
@@ -282,6 +288,7 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
         auto wait_result =
             WaitForMultipleObjectsEx((DWORD)wait_handles.size(), &wait_handles[0], FALSE, (DWORD)wait_time, TRUE);
         HANDLE signaled_object = INVALID_HANDLE_VALUE;
+        Log.trace(__FUNCTION__, __LINE__, "in while, before if (wait_result >= WAIT_OBJECT_0 && wait_result < WAIT_OBJECT_0 + wait_handles.size())");
         if (wait_result >= WAIT_OBJECT_0 && wait_result < WAIT_OBJECT_0 + wait_handles.size()) {
             signaled_object = wait_handles[(size_t)wait_result - WAIT_OBJECT_0];
         }
@@ -318,12 +325,15 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
             break;
         }
 
+        Log.trace(__FUNCTION__, __LINE__, "in while, before if (signaled_object == process_info.hProcess)");
         if (signaled_object == process_info.hProcess) {
             process_running = false;
         }
         else if (signaled_object == pipeov.hEvent) {
             // pipe read
             DWORD len = 0;
+            Log.trace(__FUNCTION__, __LINE__,
+                      "in while, before if (GetOverlappedResult(pipe_parent_read, &pipeov, &len, FALSE)) {");
             if (GetOverlappedResult(pipe_parent_read, &pipeov, &len, FALSE)) {
                 pipe_data.insert(pipe_data.end(), pipe_buffer.get(), pipe_buffer.get() + len);
                 (void)ReadFile(pipe_parent_read, pipe_buffer.get(), (DWORD)pipe_buffer.size(), nullptr, &pipeov);
@@ -339,6 +349,8 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
             if (accept_pending) {
                 // AcceptEx, client_socker is connected and first chunk of data is received
                 DWORD len = 0;
+                Log.trace(__FUNCTION__, __LINE__,
+                          "in while, before if (GetOverlappedResult(reinterpret_cast<HANDLE>(m_server_sock), &sockov, &len, FALSE)) {");
                 if (GetOverlappedResult(reinterpret_cast<HANDLE>(m_server_sock), &sockov, &len, FALSE)) {
                     // unlock after accept
                     socket_lock.unlock();
@@ -362,6 +374,8 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
                 }
             }
             else {
+                Log.trace(__FUNCTION__, __LINE__,
+                          "in while, if (GetOverlappedResult(reinterpret_cast<HANDLE>(client_socket), &sockov, &len, FALSE)) {");
                 // ReadFile
                 DWORD len = 0;
                 if (GetOverlappedResult(reinterpret_cast<HANDLE>(client_socket), &sockov, &len, FALSE)) {
@@ -383,7 +397,9 @@ std::optional<std::string> asst::Controller::call_command(const std::string& cmd
                 }
             }
         }
+        Log.trace("in while, end");
     }
+    Log.trace(__FUNCTION__, __LINE__, "after while");
 
     DWORD exit_ret = 0;
     GetExitCodeProcess(process_info.hProcess, &exit_ret);
@@ -821,6 +837,7 @@ bool asst::Controller::screencap(const std::string& cmd, const DecodeFunc& decod
         Log.error("data is empty!");
         return false;
     }
+    Log.trace(__FUNCTION__, "after call_commond", cmd);
     auto& data = ret.value();
 
     bool tried_conversion = false;
@@ -1381,6 +1398,7 @@ cv::Mat asst::Controller::get_image(bool raw)
         }
     }
     while (!success && !need_exit()) {
+        Log.trace(__FUNCTION__, "screencap failed, ready to retry with re-connect");
         if (screencap(true)) {
             break;
         }
