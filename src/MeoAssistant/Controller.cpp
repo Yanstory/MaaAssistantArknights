@@ -725,11 +725,12 @@ bool asst::Controller::screencap(bool allow_reconnect)
             return false;
         }
         Log.trace("before cvt color");
-        cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+        cv::Mat bgr;
+        cv::cvtColor(temp, bgr, cv::COLOR_RGB2BGR);
         Log.trace("after cvt color");
         std::unique_lock<std::shared_mutex> image_lock(m_image_mutex);
         Log.trace("before m_cache_image = temp");
-        m_cache_image = temp;
+        m_cache_image = bgr;
         Log.trace("after m_cache_image = temp");
         return true;
     };
