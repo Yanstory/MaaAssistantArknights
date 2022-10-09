@@ -183,8 +183,6 @@ void asst::Controller::pipe_working_proc()
 std::optional<std::string> asst::Controller::call_command(const std::string& cmd, int64_t timeout, bool allow_reconnect,
                                                           bool recv_by_socket)
 {
-    LogTraceFunction;
-
     using namespace std::chrono_literals;
     using namespace std::chrono;
     // LogTraceScope(std::string(__FUNCTION__) + " | `" + cmd + "`");
@@ -697,8 +695,6 @@ void asst::Controller::wait(unsigned id) const noexcept
 
 bool asst::Controller::screencap(bool allow_reconnect)
 {
-    LogTraceFunction;
-
     // if (true) {
     //     m_inited = true;
     //     std::unique_lock<std::shared_mutex> image_lock(m_image_mutex);
@@ -718,26 +714,31 @@ bool asst::Controller::screencap(bool allow_reconnect)
         size_t header_size = data.size() - std_size;
         Log.trace("data size", data.size(), ", std_size", std_size, ", header_size", header_size);
         auto image_data_begin = data.begin() + header_size;
+        Log.trace("before all_of");
         if (std::all_of(image_data_begin, data.end(), std::logical_not<bool> {})) {
             return false;
         }
+        Log.trace("before create mat");
         cv::Mat temp(m_height, m_width, CV_8UC4, const_cast<char*>(&(*image_data_begin)));
+        Log.trace("after create mat");
         if (temp.empty()) {
             return false;
         }
+        Log.trace("before cvt color");
         cv::cvtColor(temp, temp, cv::COLOR_RGB2BGR);
+        Log.trace("after cvt color");
         std::unique_lock<std::shared_mutex> image_lock(m_image_mutex);
+        Log.trace("before m_cache_image = temp");
         m_cache_image = temp;
+        Log.trace("after m_cache_image = temp");
         return true;
     };
 
     DecodeFunc decode_raw_with_gzip = [&](const std::string& data) -> bool {
-        LogTraceFunction;
         return decode_raw(gzip::decompress(data.data(), data.size()));
     };
 
     DecodeFunc decode_encode = [&](const std::string& data) -> bool {
-        LogTraceFunction;
         cv::Mat temp = cv::imdecode({ data.data(), int(data.size()) }, cv::IMREAD_COLOR);
         if (temp.empty()) {
             return false;
@@ -819,7 +820,6 @@ bool asst::Controller::screencap(bool allow_reconnect)
 bool asst::Controller::screencap(const std::string& cmd, const DecodeFunc& decode_func, bool allow_reconnect,
                                  bool by_socket)
 {
-    LogTraceFunction;
     if ((!m_support_socket || !m_server_started) && by_socket) [[unlikely]] {
         return false;
     }
